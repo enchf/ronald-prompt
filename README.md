@@ -101,7 +101,7 @@ The flow of this step is:
 
 Code definitions:
 
-* Welcome message (string of from file).
+* Welcome message (string or from file).
 * Action to be performed.
 * Skip prompt. The default is: `Do you want to execute the step? (Y/N)`
 * Yes response by default is `Y`. It can be overriden using `accept_value`.
@@ -125,6 +125,60 @@ In console, this will be shown as:
 $ This one can be skipped! 
   Do you want to proceed? Yes
   It was not skipped
+```
+
+#### Value Step
+
+This is a step that can requires input value. A prompt will appear asking for a valid value, and cannot be skipped.
+But it can be seen as a skip step that instead of a Yes/No answer expects a value.
+Inherits the same methods as message, but also you can (optionally) define a value prompt.
+Also, you can define validations using a `validate block`, passing a `predicate` as argument.
+
+The flow of this step is:
+
+```
+- Show message.
+- Prompt asking for a value.
+- Wait for user input to continue.
+- Validate user input.
+- Show validation failures if any.
+- If input is not valid, prompt again for a value (return to substep 2).
+- If input is valid, mark step as :done.
+``` 
+
+Code definitions:
+
+* Welcome message (string or from file).
+* Action to be performed.
+* Validations to be performed.
+* Value prompt.
+* Storage key, an identifier to enable getting the value to future steps.
+
+```ruby
+class Value < RonaldPrompt::Value
+  message 'This one requires a value!'             # Direct String
+  prompt 'Enter an integer value between 1 and 10' # Override enter prompt.
+  storage_key 'one.value'
+  
+  validate('Value needs to be an integer') { |value| value.to_s == value.to_i.to_s }
+  validate('Value must be between 1 and 10') { |value| (1..10).include? value }
+  
+  def action
+    puts "In the step 'value' method provides you the input: #{value}."
+    puts "In the whole application, 'RonaldPrompt::provide' does: #{RonaldPrompt.provide('one.value')}."
+  end
+end
+```
+
+In console, this will be shown as:
+
+```
+$ This one requires a value! 
+  Enter an integer value between 1 and 10: No
+  Value needs to be an integer. Enter an integer value between 1 and 10: 11
+  Value must be between 1 and 10. Enter an integer value between 1 and 10: 5
+  In the step 'value' method provides you the input: 5 
+  In the whole application, 'RonaldPrompt::provide' does: 5.
 ```
 
 ## Usage
