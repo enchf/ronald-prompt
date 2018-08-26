@@ -71,11 +71,10 @@ By default, that message is `Press <enter> to continue`.
 ```ruby
 class Welcome < RonaldPrompt::Message
   message 'Welcome!'        # Direct String
-  load_message 'from/file'  # Or from file, the last one is set.
-  
+  import  'from/file'       # Or from file, the last one is set.
   prompt 'Type <enter>...'  # Override enter prompt.
   
-  def action
+  execute do
     puts 'Do something'
   end
 end
@@ -117,9 +116,9 @@ Code definitions:
 class CanBeSkipped < RonaldPrompt::Skip
   message 'This one can be skipped!'  # Direct String
   prompt 'Do you want to proceed?'    # Override enter prompt.
-  accept_value `Yes`
+  accept 'Yes'
   
-  def action
+  execute do
     puts 'It was not skipped'
   end
 end
@@ -131,6 +130,9 @@ In console, this will be shown as:
 $ This one can be skipped! 
   Do you want to proceed? Yes
   It was not skipped
+
+$ This one can be skipped! 
+  Do you want to proceed? N
 ```
 
 #### Value Step
@@ -167,13 +169,13 @@ Code definitions:
 ```ruby
 class Value < RonaldPrompt::Value
   message 'This one requires a value!'
-  prompt 'Enter an integer value between 1 and 10' # Override value prompt.
-  storage_key 'one.value'
-  type :integer, 'Value needs to be an integer'    # Override type and error message.
+  prompt  'Enter an integer value between 1 and 10'   # Override value prompt.
+  key     'one.value'                                 # Storage key.
+  type    :integer, 'Value needs to be an integer'    # Override type and error message.
   
   validate('Value must be between 1 and 10') { |value| (1..10).include? value }
   
-  def action
+  execute do
     puts "In the step 'value' method provides you the input: #{value}."
     puts "In the whole application, 'RonaldPrompt::provide' does: #{RonaldPrompt.provide('one.value')}."
   end
@@ -222,15 +224,14 @@ Code definitions:
 * Default value if step is skipped.
 
 ```ruby
-class Value < RonaldPrompt::Value
+class DefaultValue < RonaldPrompt::Modify
   message 'This has a default value!'
-  prompt 'Enter an integer'
-  storage_key 'can.be.default'
-  default 10   # Automatically detects that type is :integer.
+  prompt  'Enter an integer'
+  key     'value.key'
+  default 10                          # Automatically detects that type is :integer.
+                                      # Validates that default value is one of the four allowed.
   
-  validate('Value needs to be an integer') { |value| value.to_s == value.to_i.to_s }
-  
-  def action
+  execute do
     puts "The final value is: #{value}."
   end
 end
@@ -244,11 +245,79 @@ $ This has a default value!
   The final value is 10
 ```
 
+#### Select Step
+
+This step basically allows you to select an item from a list.
+It is basically a Value step, with the possible values as the indexes of the options shown.
+The flow is as follows:
+
+```
+- Show message.
+- Show options.
+- Prompt asking for the index of the option to be selected.
+- Wait for user input to continue.
+- Validate index.
+- Show error message if index is invalid.
+- If index is not valid, prompt again for an option (return to step 2).
+- If index is valid, mark step as :done.
+```
+
+Code definitions:
+
+* Welcome message (string or from file).
+* Action to be performed.
+* Index prompt. By default is 'Select an option (0 - <last index on the list>)'.
+* Storage key, an identifier to enable getting the value to future steps.
+* If no key is provided, value is basically not stored and not available in future steps.
+* Invalid index message.
+* The options we can select.
+
+```ruby
+class Options < RonaldPrompt::Select
+  message 'This one selects a value!'
+  prompt  'We are overriding the index prompt'
+  key     'selected.value'
+  options %w[Ruby Java Python Go]
+  error   'Invalid index message here.'
+  
+  execute do
+    puts "RonaldPrompt.provide or value methods return the selected value: #{RonaldPrompt.provide('selected.value')}."
+  end
+end
+```
+
+In console, this will be shown as:
+
+```
+$ This one selects a value!
+  |---|--------|
+  | 0 | Ruby   |
+  | 1 | Java   |
+  | 2 | Python |
+  | 3 | Go     |
+  |---|--------|
+  
+  We are overriding the index prompt: 4
+  Invalid index message here.
+
+  |---|--------|
+  | 0 | Ruby   |
+  | 1 | Java   |
+  | 2 | Python |
+  | 3 | Go     |
+  |---|--------|
+  
+  We are overriding the index prompt: 0
+  RonaldPrompt.provide or value methods return the selected value: Ruby.
+```
+
 #### List Step
 
 This step is basically the flow when you add/remove elements on a list.
-It uses a value step for the options of add/remove/finish.
-For the add and remove actions, but instead of prompting the value until is valid, it returns to the 'menu'.
+It is a composition of two Select and one Value steps.
+Select step is used twice, one to select the add/remove/finish option and another one to remove a value.
+Value step is used when adding values to the list.
+After an add/remove action is executed, it returns to the 'action menu'. 
 The list step flow is as follows:
 
 ```
@@ -281,27 +350,28 @@ Code definitions:
 * Final action to be performed after the step is finished.
 
 ```ruby
-class Value < RonaldPrompt::List
+class NameList < RonaldPrompt::List
   message 'This will fill a list!'
-  menu_prompt 'This is the menu prompt (add (1), remove(2), finish(3))'
-  if_menu_fails 'This is shown if an invalid option is selected.'
+  key     'Key for the list'
   
-  add_prompt 'Enter a name less or equal than 10 characters'
-  validate('Name must be less or equal than 10 characters.') { |name| name.length <= 10 }
-  show_as { |name| name.upcase }   # Show value uppercase.
+  options.prompt 'This is the menu prompt (add (1), remove(2), finish(3))'
+  options.error  'This is shown if an invalid option is selected.'
   
-  remove_prompt 'Indexes to remove items starts from 0'
-  if_index_fails 'Indexes must be valid, as shown in values table.'
+  add.prompt  'Enter a name less or equal than 10 characters'
+  add.display { |name| name.upcase }   # Show value uppercase.
+  add.validate('Name must be less or equal than 10 characters.') { |name| name.length <= 10 }
   
-  def add_action
+  add.execute do
     puts "The value added was #{last_value}."    # Last item is accessed using last_value method.
   end
   
-  def remove_action
+  remove.prompt 'Indexes to remove items starts from 0'
+  remove.error  'Indexes must be valid, as shown in values table.'
+  remove.execute do
     puts "Here also works last_value: #{last_value}"
   end
   
-  def action
+  execute do
     puts "The final value is: [ #{value.join(',')} ]."
   end
 end
