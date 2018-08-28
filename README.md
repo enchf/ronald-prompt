@@ -19,6 +19,7 @@ Or, read this document who tries to explain it.
     * [List Step](#list-step)
     * [Group Step](#group-step)
   * [Configuration](#configuration)
+  * [Sample Application](#sample-application) 
 * [Authors](#authors)
 * [License](#license)
 
@@ -347,6 +348,7 @@ Code definitions:
 | execute  | Action to perform after selecting a value.        | (empty method)  |
 | error    | Message error when index type validation fails.   | `Invalid index` |
 | options  | Options we can select. *This is required*         | None            |
+| display  | How the elements are displayed at prompting.      | Uses `.to_s`    |
 | prompt   | Prompt message when asking for an index.          | `Select an option (0 - <last index>)` |
 
 Notes:
@@ -367,6 +369,7 @@ class Options < RonaldPrompt::Select
   key     'selected.value'
   options %w[Ruby Java Python Go]
   error   'Invalid index message here.'
+  display { |lang| "#{lang} language." }
   
   execute do
     puts "RonaldPrompt.provide or value methods return the selected value: #{RonaldPrompt.provide('selected.value')}."
@@ -379,22 +382,22 @@ In console, this will be shown as:
 ```
 $ This one selects a value!
 
-  |---|--------|
-  | 0 | Ruby   |
-  | 1 | Java   |
-  | 2 | Python |
-  | 3 | Go     |
-  |---|--------|
+  |---|------------------|
+  | 0 | Ruby language.   |
+  | 1 | Java language.   |
+  | 2 | Python language. |
+  | 3 | Go language.     |
+  |---|------------------|
   
   We are overriding the index prompt: 4
   Invalid index message here.
 
-  |---|--------|
-  | 0 | Ruby   |
-  | 1 | Java   |
-  | 2 | Python |
-  | 3 | Go     |
-  |---|--------|
+  |---|------------------|
+  | 0 | Ruby language.   |
+  | 1 | Java language.   |
+  | 2 | Python language. |
+  | 3 | Go language.     |
+  |---|------------------|
   
   We are overriding the index prompt: 0
   RonaldPrompt.provide or value methods return the selected value: Ruby.
@@ -561,9 +564,130 @@ $ This will fill a list!
 
 Group step is basically a hybrid Skip step, which can have configured a set of steps in YAML configuration.
 In code, it works exactly as a Skip step, but in configuration, a set of sub-steps can be assigned.
-See [Usage](#usage) section for configuration examples. 
+See [Configuration](#configuration) section for a configuration example. 
+
+Notes:
+
+* Sub-steps are defined in configuration through a `steps` property.
+* Group steps can be composed of another group steps.
+* If a non-group step is defined with 'steps' property, the application will raise an error at launch.
 
 ### Configuration
+
+The YAML configuration file is very simple, and has variations only for the group step.
+Suppose we have a sample application that creates a git repository.
+First, it will ask for the name of the repo, and will prompt for a main programming language for it.
+After, it has an optional step in which you can setup License and .gitignore from lists.
+After that you can optionally setup a repo description, and finally select a remote target (Github, Bitbucket).
+ 
+This will be the configuration file:
+
+```yaml
+base_dir: 'lib/steps'
+steps:
+  - Welcome
+  - Name
+  - ProgrammingLanguage
+  - AdvancedConfig
+    steps:
+      - License
+      - Gitignore
+  - RepoDescription
+  - RemoteTarget
+```
+
+Notes:
+
+* The gem will scan the `base_dir` for step classes, so the names in the YAML must find a class there.
+* To follow a good practice, all steps should be defined in the same directory.
+* A common error is to have twice defined the same step in two or more files. It will make this step to be overridden.
+* At launch, the application will validate that the classes exists, and that they are setup correctly.
+* In case of an step is not defined or any of the steps have errors, app will launch an exception showing errors.
+* If a non-group step is defined with 'steps' property, it will raise an error.
+
+### Sample Application
+
+For the application defined in [Configuration](#configuration) section, we can show how will be the 8 steps defined:
+
+* Welcome Step
+
+```ruby
+class Welcome < RonaldPrompt::Message
+  message 'Welcome to the Repo Creator!'
+end
+```
+
+* Name Step
+
+```ruby
+class Name < RonaldPrompt::Value
+  prompt_lines = [
+    'Enter a name for the repository, with the following rules:',
+    'Name length must be between 5 and 30 characters.',
+    'Name can only contain letters, numbers, - and _',
+    'Name must start with a letter'
+  ]
+
+  prompt prompt_lines.join("\n")
+  
+  validate(prompt_lines[1]) { |name| (5..30).include?(name.length) }
+  validate(prompt_lines[2]) { |name| /^[a-zA-Z\-_0-9]+$/.match(name) }
+  validate(prompt_lines[3]) { |name| /^[a-zA-Z]/.match(name) }
+end
+```
+
+* ProgrammingLanguage Step
+
+```ruby
+class ProgrammingLanguage < RonaldPrompt::Select
+  prompt  'Select a programming language'
+  options Catalogs.languages
+end
+```
+
+* AdvancedConfig Step
+
+```ruby
+class AdvancedConfig < RonaldPrompt::Group
+  prompt 'Do you want to configure License and Gitignore? (Y/N)'
+end
+```
+
+* License
+
+```ruby
+class License < RonaldPrompt::Select
+  prompt 'Select a License'
+  options Catalogs.licenses
+end
+```
+
+* Gitignore
+
+```ruby
+class Gitignore < RonaldPrompt::Select
+  prompt 'Select a Gitignore configuration'
+  options Catalogs.gitignores
+end
+```
+
+* RepoDescription
+
+```ruby
+class RepoDescription < RonaldPrompt::Value
+  prompt 'Enter a repo description up to 100 characters'
+  validate('Description should be up to 100 characters') { |description| description.length <= 100 }
+end
+```
+
+* RemoteTarget
+
+```ruby
+class RemoteTarget < RonaldPrompt::Select
+  prompt 'Select a Remote Target'
+  options Catalogs.targets
+end
+```
 
 ## Authors
 
