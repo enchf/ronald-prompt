@@ -5,6 +5,23 @@ Ronald simplifies the creation of a Terminal Wizard.
 As a sample, see [Gemerator](https://github.com/enchf/gemerator) to see in code how to apply Ronald Prompt patterns.
 Or, read this document who tries to explain it. 
 
+## Table of Contents
+
+* [Getting Started](#getting-started)
+  * [Installing](#installing)
+* [Main Concepts](#main-concepts)
+  * [Step Types](#step-types)
+    * [Message Step](#message-step)
+    * [Skip Step](#skip-step)
+    * [Value Step](#value-step)
+    * [Modify Step](#modify-step)
+    * [Select Step](#select-step)
+    * [List Step](#list-step)
+    * [Group Step](#group-step)
+  * [Configuration](#configuration)
+* [Authors](#authors)
+* [License](#license)
+
 ## Getting Started
 
 ### Installing
@@ -546,7 +563,7 @@ Group step is basically a hybrid Skip step, which can have configured a set of s
 In code, it works exactly as a Skip step, but in configuration, a set of sub-steps can be assigned.
 See [Usage](#usage) section for configuration examples. 
 
-## Usage
+### Configuration
 
 ## Authors
 
