@@ -61,12 +61,21 @@ The flow of this step is:
 - Mark step as :done 
 ``` 
 
-So, what in code I need to define?
+So, what in code I can define?
 
-* Assign a message (directly or from file)
-* Optionally define an action.
-* Override the 'continue' prompt (that which ask to press enter to continue).
-By default, that message is `Press <enter> to continue`.
+| Method  | Description                                      | Default Value  |
+| ------- | ------------------------------------------------ | -------------- |
+| message | Display message when launching step.             | (empty string) |
+| import  | Import display message from a file.              | (empty string) |
+| execute | Action to perform previous to finish the step.   | (empty method) |
+| prompt  | Prompt message when asking to continue the step. | `Press <enter> to continue` |
+
+Notes:
+
+* All definitions are optional.
+* Each call to message or import overrides previously assigned message. Last value is taken.
+
+This is how it is seen in code:
 
 ```ruby
 class Welcome < RonaldPrompt::Message
@@ -106,11 +115,20 @@ The flow of this step is:
 
 Code definitions:
 
-* Welcome message (string or from file).
-* Action to be performed.
-* Skip prompt. The default is: `Do you want to execute the step? (Y/N)`
-* Yes response by default is `Y`. It can be overriden using `accept_value`.
-* No response is always anything other than the positive response, to keep it simple.
+| Method  | Description                                  | Default Value  |
+| ------- | -------------------------------------------- | -------------- |
+| message | Display message when launching step.         | (empty string) |
+| import  | Import display message from a file.          | (empty string) |
+| accept  | Value to avoid skipping the step.            | `Y`            |  
+| execute | Action to perform if step is not skipped.    | (empty method) |
+| prompt  | Prompt message when asking to skip the step. | `Do you want to execute the step? (Y/N)` |
+
+Notes:
+
+* All definitions are optional.
+* Each call to message or import overrides previously assigned message. Last value is taken.
+
+This is how it is seen in code:
 
 ```ruby
 class CanBeSkipped < RonaldPrompt::Skip
@@ -156,28 +174,41 @@ The flow of this step is:
 
 Code definitions:
 
-* Welcome message (string or from file).
-* Action to be performed.
-* Validations to be performed. Separate calls to 'validate' method will add a validation.
-* Value prompt.
-* Storage key, an identifier to enable getting the value to future steps.
-* If no key is provided, value is basically not stored and not available in future steps.
-* The type of the value, which by default is 'string'.
-* Valid types are primitives in Ruby: integer, float, string, boolean.
-* Also, the invalid type error message can be set within the type, and by default is 'Invalid type'. 
+| Method   | Description                                       | Default Value   |
+| -------- | ------------------------------------------------- | --------------- |
+| message  | Display message when launching step.              | (empty string)  |
+| import   | Import display message from a file.               | (empty string)  |
+| key      | Key to enable getting step value in future steps. | (no key)        |
+| execute  | Action to perform after entering a valid value.   | (empty method)  |
+| validate | Validations on input value, receives a block.     | (no validation) |
+| prompt   | Prompt message when asking for a value.           | `Enter value`   |
+| type     | Type and error message of the input value.        | `:string, 'Invalid type'` |
+
+Notes:
+
+* All definitions are optional.
+* Validation for type is implicit. For example, entering NaN value for an :integer will show type error message.
+* Valid types are primitives in Ruby: `:integer, :float, :string, :boolean`.
+* Extra validations are executed sequentially as they are defined. Can have more than 1 validation.
+* Each call to message or import overrides previously assigned message. Last value is taken.
+* We can recover the input value in `execute` block using `value` function.
+* In future steps, when providing a key, value can be retrieved using `RonaldPrompt.provide` method.
+* If no key is provided, step value will not be available in future steps.
+
+This is how it is seen in code:
 
 ```ruby
 class Value < RonaldPrompt::Value
   message 'This one requires a value!'
   prompt  'Enter an integer value between 1 and 10'   # Override value prompt.
-  key     'one.value'                                 # Storage key.
+  key     :key_to_value                               # Storage key.
   type    :integer, 'Value needs to be an integer'    # Override type and error message.
   
   validate('Value must be between 1 and 10') { |value| (1..10).include? value }
   
   execute do
     puts "In the step 'value' method provides you the input: #{value}."
-    puts "In the whole application, 'RonaldPrompt::provide' does: #{RonaldPrompt.provide('one.value')}."
+    puts "In the whole application, 'RonaldPrompt::provide' does: #{RonaldPrompt.provide(:key_to_value)}."
   end
 end
 ```
@@ -215,21 +246,38 @@ Otherwise it follows the value step flow.
 
 Code definitions:
 
-* Welcome message (string or from file).
-* Action to be performed.
-* Validations to be performed.
-* Value prompt.
-* Storage key, an identifier to enable getting the value to future steps.
-* If no key is provided, value is basically not stored and not available in future steps.
-* Default value if step is skipped.
+| Method   | Description                                       | Default Value   |
+| -------- | ------------------------------------------------- | --------------- |
+| message  | Display message when launching step.              | (empty string)  |
+| import   | Import display message from a file.               | (empty string)  |
+| key      | Key to enable getting step value in future steps. | (no key)        |
+| execute  | Action to perform after entering a valid value.   | (empty method)  |
+| validate | Validations on input value, receives a block.     | (no validation) |
+| default  | Establish a default value. *This is required*     | None            |
+| error    | Message error when input type validation fails.   | `Invalid type`  |
+| prompt   | Prompt message when asking for a value.           | `Enter value (default = #default)` |
+
+Notes:
+
+* A default value is required for this step.
+* Validates that default value type is one of the four allowed: `:integer, :float, :string, :boolean`.
+* This step infers the input value type as per the default one.
+* That means that input value is validated against default value type.
+* In default prompt, the legend `(default = #default)` is always appended to enable user to know the default one.
+* Extra validations are executed sequentially as they are defined. Can have more than 1 validation.
+* Each call to message or import overrides previously assigned message. Last value is taken.
+* We can recover the input value in `execute` block using `value` function.
+* In future steps, when providing a key, value can be retrieved using `RonaldPrompt.provide` method.
+* If no key is provided, step value will not be available in future steps.
+
+This is how it is seen in code:
 
 ```ruby
 class DefaultValue < RonaldPrompt::Modify
   message 'This has a default value!'
   prompt  'Enter an integer'
-  key     'value.key'
+  error   'This appears if your input is a different type than the default value'
   default 10                          # Automatically detects that type is :integer.
-                                      # Validates that default value is one of the four allowed.
   
   execute do
     puts "The final value is: #{value}."
@@ -242,7 +290,17 @@ In console, this will be shown as:
 ```
 $ This has a default value! 
   Enter an integer:
-  The final value is 10
+  The final value is 10.
+
+$ This has a default value! 
+  Enter an integer: 400
+  The final value is 400.
+
+$ This has a default value! 
+  Enter an integer: NaN 
+  This appears if your input is a different type than the default value
+  Enter an integer: 42
+  The final value is 42.
 ```
 
 #### Select Step
@@ -264,13 +322,26 @@ The flow is as follows:
 
 Code definitions:
 
-* Welcome message (string or from file).
-* Action to be performed.
-* Index prompt. By default is 'Select an option (0 - <last index on the list>)'.
-* Storage key, an identifier to enable getting the value to future steps.
-* If no key is provided, value is basically not stored and not available in future steps.
-* Invalid index message.
-* The options we can select.
+| Method   | Description                                       | Default Value   |
+| -------- | ------------------------------------------------- | --------------- |
+| message  | Display message when launching step.              | (empty string)  |
+| import   | Import display message from a file.               | (empty string)  |
+| key      | Key to enable getting step value in future steps. | (no key)        |
+| execute  | Action to perform after selecting a value.        | (empty method)  |
+| error    | Message error when index type validation fails.   | `Invalid index` |
+| options  | Options we can select. *This is required*         | None            |
+| prompt   | Prompt message when asking for an index.          | `Select an option (0 - <last index>)` |
+
+Notes:
+
+* The options to choose are required for this step.
+* Input is validated to be a valid index on the list.
+* Each call to message or import overrides previously assigned message. Last value is taken.
+* We can recover the input value in `execute` block using `value` function.
+* In future steps, when providing a key, value can be retrieved using `RonaldPrompt.provide` method.
+* If no key is provided, step value will not be available in future steps.
+
+This is how it is seen in code:
 
 ```ruby
 class Options < RonaldPrompt::Select
@@ -290,6 +361,7 @@ In console, this will be shown as:
 
 ```
 $ This one selects a value!
+
   |---|--------|
   | 0 | Ruby   |
   | 1 | Java   |
@@ -334,32 +406,76 @@ The list step flow is as follows:
 - If 'finish', execute action and mark step as :done. 
 ```
 
-Code definitions:
+Code definitions here are separated in four:
 
-* Welcome message (string or from file).
-* Menu prompt, this means, the way we ask for action (add/remove/finish).
-* Invalid action message, by default is 'Select a valid option'.
-* Add prompt, prompt requesting a value to be added.
-* Value validations.
-* Action to be (optionally) executed after add.
-* The way in which the values added are displayed, by default uses `.to_s` method.
-* Storage key for the list. If not provided the list is not available in future steps.
-* Remove Prompt, prompt requesting index of the element to be removed.
-* Action to be (optionally) executed after remove.
-* The 'index not found' message.
-* Final action to be performed after the step is finished.
+* Definitions for the step per-se.
+
+| Method   | Description                                       | Default Value   |
+| -------- | ------------------------------------------------- | --------------- |
+| message  | Display message when launching step.              | (empty string)  |
+| import   | Import display message from a file.               | (empty string)  |
+| key      | Key to enable getting the list in future steps.   | (no key)        |
+| execute  | Action to perform after finishing the list.       | (empty method)  |
+
+Also, it has 3 methods to enable the setup of the sub-steps.
+See code sample to see them in action.
+
+| Method   | Description       |
+| -------- | ----------------- |
+| select   | Object reference to set definitions when selecting an action.         | 
+| add      | Object reference to set definitions when input values.                |
+| remove   | Object reference to set definitions when removing values of the list. |
+
+* Definitions for the options. It is seen as a Select Step with 3 options: `:add, :remove, :finish`.
+Each of the options chain other steps: `:add` chains a Value step, and `:remove` a Select Step.
+The option `finish` 'returns' to the outer step and finish it. So the definitions for this are:
+
+| Method | Description                          | Default Value    |
+| ------ | ------------------------------------ | ---------------- |
+| prompt | Prompt message for an action option. | `Select an option: add (0), remove(1), finish (2)` |
+| error  | When the option selected is invalid. | `Invalid option` |
+
+* Definitions on the add action. The add action is basically a Value step but instead of loop until
+a valid value is input, it returns to the main menu. It has all Value step methods except of `key`,
+`input` and `message`, with the addition of `unique` setting which disables repeated values on the list.
+If set to true, it validates input and shows an error message if a repeated value is tried to be added.
+Also, the way in which the elements are shown in the list can be overriden with the `display` option.
+
+| Method   | Description                                                | Default Value    |
+| -------- | ---------------------------------------------------------- | ---------------- |
+| execute  | Action to execute after an element is added.               | (empty method)   |
+| validate | Validations on the added element.                          | (no validations) |
+| prompt   | Prompt shown when requesting a value.                      | `Enter value`    |
+| display  | The way in which the added elements are shown in Terminal. | Uses `.to_s`     |
+| type     | Type of the elements on the list and invalid type message. | `:string, 'Invalid type'` | 
+| unique   | True if the list accepts only unique elements.             | `false, 'Repeated element'` |
+
+* Definitions on the remove action. This option is a Select step, having all current list elements as options.
+The action performed on the Select step is to remove the element.
+Also, a post-remove action can be set with `execute` method.
+
+| Method   | Description                                       | Default Value    |
+| -------- | ------------------------------------------------- | ---------------- |
+| execute  | Action to execute after an element is removed.    | (empty method)   |
+| error    | Error message shown if an invalid index is input. | `Invalid index`  |
+| prompt   | Prompt shown when requesting an element index.    | `Select element` |
 
 ```ruby
 class NameList < RonaldPrompt::List
   message 'This will fill a list!'
   key     'Key for the list'
   
-  options.prompt 'This is the menu prompt (add (1), remove(2), finish(3))'
-  options.error  'This is shown if an invalid option is selected.'
+  execute do
+    puts "The final value is: [ #{value.join(',')} ]."
+  end
+  
+  select.prompt 'This is the menu prompt (add (0), remove (1), finish (2))'
+  select.error  'This is shown if an invalid option is selected.'
   
   add.prompt  'Enter a name less or equal than 10 characters'
   add.display { |name| name.upcase }   # Show value uppercase.
   add.validate('Name must be less or equal than 10 characters.') { |name| name.length <= 10 }
+  add.unique true, 'Overriding error message if a repeated element is added.'
   
   add.execute do
     puts "The value added was #{last_value}."    # Last item is accessed using last_value method.
@@ -367,12 +483,9 @@ class NameList < RonaldPrompt::List
   
   remove.prompt 'Indexes to remove items starts from 0'
   remove.error  'Indexes must be valid, as shown in values table.'
+  
   remove.execute do
     puts "Here also works last_value: #{last_value}"
-  end
-  
-  execute do
-    puts "The final value is: [ #{value.join(',')} ]."
   end
 end
 ```
@@ -385,9 +498,9 @@ $ This will fill a list!
   |   |                       |
   |---|-----------------------|
   
-  This is the menu prompt (add (1), remove(2), finish(3)): 4
+  This is the menu prompt (add (0), remove (1), finish (2)): 4
   This is shown if an invalid option is selected.
-  This is the menu prompt (add (1), remove(2), finish(3)): 1
+  This is the menu prompt (add (0), remove (1), finish (2)): 0
   Enter a name less than 10 characters: Longeeeername
   Name must be less or equal than 10 characters.
   Enter a name less than 10 characters: Jose
@@ -397,7 +510,7 @@ $ This will fill a list!
   | 0 | JOSE                  |
   |---|-----------------------|
   
-  This is the menu prompt (add (1), remove(2), finish(3)): 1
+  This is the menu prompt (add (0), remove (1), finish (2)): 0
   Enter a name less than 10 characters: Maria
   The value added was Maria.
     
@@ -406,7 +519,7 @@ $ This will fill a list!
   | 1 | MARIA                 |
   |---|-----------------------|
   
-  This is the menu prompt (add (1), remove(2), finish(3)): 2
+  This is the menu prompt (add (0), remove (1), finish (2)): 1
   Indexes to remove items starts from 0: 2
   Indexes must be valid, as shown in values table.
   
@@ -415,7 +528,7 @@ $ This will fill a list!
   | 1 | MARIA                 |
   |---|-----------------------|
     
-  This is the menu prompt (add (1), remove(2), finish(3)): 2
+  This is the menu prompt (add (0), remove (1), finish (2)): 1
   Indexes to remove items starts from 0: 0
   Here also works last_value: Jose
   
@@ -423,7 +536,7 @@ $ This will fill a list!
   | 0 | MARIA                 |
   |---|-----------------------|
     
-  This is the menu prompt (add (1), remove(2), finish(3)): 3
+  This is the menu prompt (add (0), remove (1), finish (2)): 2
   The final value is [ Maria ].
 ```
 
