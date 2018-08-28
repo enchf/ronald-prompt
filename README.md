@@ -542,6 +542,10 @@ $ This will fill a list!
 
 #### Group Step
 
+Group step is basically a hybrid Skip step, which can have configured a set of steps in YAML configuration.
+In code, it works exactly as a Skip step, but in configuration, a set of sub-steps can be assigned.
+See [Usage](#usage) section for configuration examples. 
+
 ## Usage
 
 ## Authors
