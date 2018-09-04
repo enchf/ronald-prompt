@@ -10,6 +10,7 @@ Or, read this document who tries to explain it.
 * [Getting Started](#getting-started)
   * [Installing](#installing)
 * [Main Concepts](#main-concepts)
+  * [Configuration](#configuration)
   * [Step Types](#step-types)
     * [Message Step](#message-step)
     * [Skip Step](#skip-step)
@@ -18,7 +19,6 @@ Or, read this document who tries to explain it.
     * [Select Step](#select-step)
     * [List Step](#list-step)
     * [Group Step](#group-step)
-  * [Configuration](#configuration)
   * [Sample Application](#sample-application) 
 * [Authors](#authors)
 * [License](#license)
@@ -56,6 +56,39 @@ As they are sequentially, they can modify without concurrent worries the state o
 
 So how the steps are interconnected? Through a configuration file in YAML format.
 In this way we can decouple steps and flow from code.
+
+### Configuration
+
+The YAML configuration file is very simple, and has variations only for the group step.
+Suppose we have a sample application that creates a git repository.
+First, it will ask for the name of the repo, and will prompt for a main programming language for it.
+After, it has an optional step in which you can setup License and .gitignore from lists.
+After that you can optionally setup a repo description, and finally select a remote target (Github, Bitbucket).
+ 
+This will be the configuration file:
+
+```yaml
+base_dir: 'lib/steps'
+steps:
+  - Welcome
+  - Name
+  - ProgrammingLanguage
+  - AdvancedConfig
+    steps:
+      - License
+      - Gitignore
+  - RepoDescription
+  - RemoteTarget
+```
+
+Notes:
+
+* The gem will scan the `base_dir` for step classes, so the names in the YAML must find a class there.
+* To follow a good practice, all steps should be defined in the same directory.
+* A common error is to have twice defined the same step in two or more files. It will make this step to be overridden.
+* At launch, the application will validate that the classes exists, and that they are setup correctly.
+* In case of an step is not defined or any of the steps have errors, app will launch an exception showing errors.
+* If a non-group step is defined with 'steps' property, it will raise an error.
 
 ### Step Types
 
@@ -571,39 +604,6 @@ Notes:
 * Sub-steps are defined in configuration through a `steps` property.
 * Group steps can be composed of another group steps.
 * If a non-group step is defined with 'steps' property, the application will raise an error at launch.
-
-### Configuration
-
-The YAML configuration file is very simple, and has variations only for the group step.
-Suppose we have a sample application that creates a git repository.
-First, it will ask for the name of the repo, and will prompt for a main programming language for it.
-After, it has an optional step in which you can setup License and .gitignore from lists.
-After that you can optionally setup a repo description, and finally select a remote target (Github, Bitbucket).
- 
-This will be the configuration file:
-
-```yaml
-base_dir: 'lib/steps'
-steps:
-  - Welcome
-  - Name
-  - ProgrammingLanguage
-  - AdvancedConfig
-    steps:
-      - License
-      - Gitignore
-  - RepoDescription
-  - RemoteTarget
-```
-
-Notes:
-
-* The gem will scan the `base_dir` for step classes, so the names in the YAML must find a class there.
-* To follow a good practice, all steps should be defined in the same directory.
-* A common error is to have twice defined the same step in two or more files. It will make this step to be overridden.
-* At launch, the application will validate that the classes exists, and that they are setup correctly.
-* In case of an step is not defined or any of the steps have errors, app will launch an exception showing errors.
-* If a non-group step is defined with 'steps' property, it will raise an error.
 
 ### Sample Application
 
